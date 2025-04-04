@@ -1,0 +1,93 @@
+/ Formatted on 7/31/2020 11:52:46 AM (QP5 v5.215.12089.38647) /
+  SELECT b.vc_product_code vc_item_code,
+         C.VC_ITEM_DESC,
+         C.VC_SUP_ITEM_CODE BARCODE,
+         SUM (nu_product_quantity) qty,
+         (SELECT NVL (a.NU_PRODUCT_RATE, a.nu_cost_price) last_price
+            FROM sales.dt_invoice a
+           WHERE     vc_comp_code = :comp_code
+                 AND vc_product_code = b.vc_product_code
+                 AND a.ROWID =
+                        (SELECT MAX (b.ROWID)
+                           FROM sales.dt_invoice b
+                          WHERE     b.vc_comp_code = a.vc_comp_code
+                                AND b.VC_PRODUCT_CODE = a.VC_PRODUCT_CODE
+                                AND TO_DATE (b.DT_INVOICE_DATE, 'DD-MM-YYYY') =
+                                       (SELECT MAX (
+                                                  TO_DATE (c.DT_INVOICE_DATE,
+                                                           'DD-MM-YYYY'))
+                                          FROM sales.dt_invoice c
+                                         WHERE     c.vc_comp_code =
+                                                      b.vc_comp_code
+                                               AND c.VC_PRODUCT_CODE =
+                                                      b.VC_PRODUCT_CODE)))
+            last_invoice_price
+    FROM hd_invoice a, dt_invoice b, makess.mst_item c
+   WHERE     a.vc_comp_code = b.vc_comp_code
+         AND b.vc_comp_code = c.vc_comp_code
+         AND a.vc_wh_code LIKE NVL (:wh_code, '%')
+         AND a.vc_invoice_no = b.vc_invoice_no
+         AND a.dt_invoice_date = b.dt_invoice_date
+         AND b.vc_product_code = c.vc_item_code
+         AND a.vc_comp_code = :comp_code
+         AND b.vc_product_code LIKE NVL (:item_code, '%')
+         AND a.NU_CUSTOMER_CODE = '78'
+         AND TO_DATE (a.dt_invoice_date, 'DD-MM-RRRR') >=
+                TO_DATE (:from_date, 'dd-mm-rrrr')
+         AND TO_DATE (a.dt_invoice_date, 'DD-MM-RRRR') <=
+                TO_DATE (:TO_DATE, 'dd-mm-rrrr')
+GROUP BY b.vc_product_code, C.VC_ITEM_DESC, C.VC_SUP_ITEM_CODE
+ORDER BY 2
+
+
+--------for with classsificayppn 
+
+/ Formatted on 2021/06/26 12:43 (Formatter Plus v4.8.8) /
+SELECT y.vc_item_code, y.vc_item_desc, y.vc_sup_item_code barcode,
+       z.vc_reason_desc classification, NVL (x.qty, 0) qty,
+       NVL (x.last_invoice_price, 0) last_invoice_price
+  FROM (SELECT   b.vc_product_code vc_item_code, c.vc_item_desc,
+                 c.vc_sup_item_code barcode, SUM (nu_product_quantity) qty,
+                 (SELECT NVL (a.nu_product_rate, a.nu_cost_price)
+                                               last_price
+                    FROM sales.dt_invoice a
+                   WHERE vc_comp_code = :comp_code
+                     AND vc_product_code = b.vc_product_code
+                     AND a.ROWID =
+                            (SELECT MAX (b.ROWID)
+                               FROM sales.dt_invoice b
+                              WHERE b.vc_comp_code = a.vc_comp_code
+                                AND b.vc_product_code = a.vc_product_code
+                                AND TO_DATE (b.dt_invoice_date, 'DD-MM-YYYY') =
+                                       (SELECT MAX
+                                                  (TO_DATE (c.dt_invoice_date,
+                                                            'DD-MM-YYYY'
+                                                           )
+                                                  )
+                                          FROM sales.dt_invoice c
+                                         WHERE c.vc_comp_code = b.vc_comp_code
+                                           AND c.vc_product_code =
+                                                             b.vc_product_code)))
+                                                           last_invoice_price
+            FROM hd_invoice a, dt_invoice b, makess.mst_item c
+           WHERE a.vc_comp_code = b.vc_comp_code
+             AND b.vc_comp_code = c.vc_comp_code
+             AND a.vc_wh_code LIKE NVL (:wh_code, '%')
+             AND a.vc_invoice_no = b.vc_invoice_no
+             AND a.dt_invoice_date = b.dt_invoice_date
+             AND b.vc_product_code = c.vc_item_code
+             AND a.vc_comp_code = :comp_code
+             AND b.vc_product_code LIKE NVL (:item_code, '%')
+             AND a.nu_customer_code = '78'
+             AND TO_DATE (a.dt_invoice_date, 'DD-MM-RRRR') >=
+                                            TO_DATE (:from_date, 'dd-mm-rrrr')
+             AND TO_DATE (a.dt_invoice_date, 'DD-MM-RRRR') <=
+                                              TO_DATE (:TO_DATE, 'dd-mm-rrrr')
+        GROUP BY b.vc_product_code, c.vc_item_desc, c.vc_sup_item_code) x,
+       makess.mst_item y,
+       invent.mst_reason z
+ WHERE y.vc_comp_code = '02'
+   AND y.vc_comp_code = z.vc_comp_code
+   AND y.vc_item_code = x.vc_item_code(+)
+   AND z.vc_reason_flg = 'C'
+   AND y.vc_classification = z.vc_reason_code
